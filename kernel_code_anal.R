@@ -36,14 +36,14 @@ dt <- dt[cal, `:=`(date = i.date
 dt[prices, sell_price := i.sell_price, on = c("store_id", "item_id", "wm_yr_wk")]
 
 # lag 변수 추가
-lag <- c(1, 2, 3, 4, 7, 14, 21, 28)
+lag <- c(7, 14, 21, 28)
 dt[, (paste0("lag_", lag)) := shift(.SD, lag), .SDcols = "sales", by = "id"]
 
 #추세를 반영하기 위한 roll_mean변수 추가 1)평균, 2)최대값
-win <- c(7, 14, 84, 168)
+win <- c(7, 28, 28*3, 28*6)
 dt[, (paste0("roll_mean_28_", win)) := frollmean(lag_28, win), by = "id"]
 
-win <- c(7, 14, 84, 168)
+win <- c(7, 28)
 dt[, (paste0("roll_max_28_", win)) := frollapply(lag_28, win, max), by = "id"]
 
 #가격 변동에 관한 변수
@@ -107,7 +107,7 @@ p <- list(objective = "regression_l2",
 
 m_lgb <- lgb.train(params = p,
                    data = xtr,
-                   nrounds = 2000,
+                   nrounds = 4000,
                    valids = list(train = xtr, valid = xval),
                    early_stopping_rounds = 100,
                    eval_freq = 50)
@@ -116,7 +116,7 @@ lgb.plot.importance(lgb.importance(m_lgb), 20)
 
 m_lgb <- lgb.train(params = p,
                    data = xdat,
-                   nrounds = 1801)
+                   nrounds = m_lgb$best_iter)
 
 # 기존모형 [2000]:	train's rmse:2.06511	valid's rmse:1.90673 
 
@@ -141,7 +141,7 @@ te[date >= fday
    ][date >= fday+h, id := sub("validation", "evaluation", id)
      ][, d := paste0("F", 1:28), by = id
        ][, dcast(.SD, id ~ d, value.var = "sales")
-         ][, fwrite(.SD, "data/many_feature.csv")]
+         ][, fwrite(.SD, "data/few_feature_full_data.csv")]
 
 #################################33 함수
 create_dt <- function(is_train = TRUE, nrows = Inf) {
@@ -175,13 +175,14 @@ create_dt <- function(is_train = TRUE, nrows = Inf) {
 
 create_fea <- function(dt) {
   
-  lag <- c(1, 2, 3, 4, 7, 14, 21, 28)
+  lag <- c(7, 14, 21, 28)
   dt[, (paste0("lag_", lag)) := shift(.SD, lag), .SDcols = "sales", by = "id"]
   
-  win <- c(7, 14, 84, 168)
+  #추세를 반영하기 위한 roll_mean변수 추가 1)평균, 2)최대값
+  win <- c(7, 28, 28*3, 28*6)
   dt[, (paste0("roll_mean_28_", win)) := frollmean(lag_28, win), by = "id"]
   
-  win <- c(7, 14, 84, 168)
+  win <- c(7, 28)
   dt[, (paste0("roll_max_28_", win)) := frollapply(lag_28, win, max), by = "id"]
   
   dt[, price_change_1 := sell_price / shift(sell_price) - 1, by = "id"]
