@@ -11,6 +11,8 @@ igc <- function() {
 }
 igc()
 
+path <- "data/"
+sample_submission <- fread(file.path(path, "sample_submission.csv"))
 
 data_prerocess <- function(i) {
   igc()
@@ -120,7 +122,7 @@ data_prerocess <- function(i) {
                    valids = list(valid = valid))
   
   
-  test2 <- test[F %in% paste0('F', seq(7*(i-1)+1, 7*i))]
+  test2 <- test[F == paste0('F', i)]
   pred <- predict(fit, data.matrix(test2[, x, with = FALSE]))
   test2[, demand := pmax(0, pred)]
   test_long <- dcast(test2, id ~ F, value.var = "demand")
@@ -128,9 +130,10 @@ data_prerocess <- function(i) {
   return(test_long)
 }
 
+submit_data <- list()
 
 for(i in 1:28){
-  model_data <- data_prerocess(calendar, selling_prices, sample_submission, sales, i)
+  model_data <- data_prerocess(i)
   submit_data[[i]] <- model_data
   print(i)
   igc()
@@ -144,4 +147,4 @@ for(i in 1:28){
                       by = "id")   
 }
 
-fwrite(submission, file = "data/submission_step.csv", row.names = FALSE)
+fwrite(submission, file = "data/submission_re_step.csv", row.names = FALSE)
