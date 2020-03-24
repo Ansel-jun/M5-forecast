@@ -10,16 +10,16 @@ igc <- function() {
   invisible(gc()); invisible(gc())   
 }
 igc()
-path <- "data/"
 
 
-calendar <- fread(file.path(path, "calendar.csv"))
-selling_prices <- fread(file.path(path, "sell_prices.csv"))
-sample_submission <- fread(file.path(path, "sample_submission.csv"))
-sales <- fread(file.path(path, "sales_train_validation.csv"))
-
-
-data_prerocess <- function(calendar, selling_prices, sample_submission, sales, i) {
+data_prerocess <- function(i) {
+  igc()
+  path <- "data/"
+  
+  calendar <- fread(file.path(path, "calendar.csv"))
+  selling_prices <- fread(file.path(path, "sell_prices.csv"))
+  sample_submission <- fread(file.path(path, "sample_submission.csv"))
+  sales <- fread(file.path(path, "sales_train_validation.csv"))
   
   # Calendar
   calendar[, `:=`(date = NULL, 
@@ -119,15 +119,15 @@ data_prerocess <- function(calendar, selling_prices, sample_submission, sales, i
                    eval_freq = 100, early_stopping_rounds = 200, 
                    valids = list(valid = valid))
   
-  test <- test[F == paste0('F', i)]
-  pred <- predict(fit, data.matrix(test[, x, with = FALSE]))
-  test[, demand := pmax(0, pred)]
-  test_long <- dcast(test, id ~ F, value.var = "demand")
+  
+  test2 <- test[F %in% paste0('F', seq(7*(i-1)+1, 7*i))]
+  pred <- predict(fit, data.matrix(test2[, x, with = FALSE]))
+  test2[, demand := pmax(0, pred)]
+  test_long <- dcast(test2, id ~ F, value.var = "demand")
   
   return(test_long)
 }
 
-submit_data <- list()
 
 for(i in 1:28){
   model_data <- data_prerocess(calendar, selling_prices, sample_submission, sales, i)
@@ -136,3 +136,12 @@ for(i in 1:28){
   igc()
 }
 
+submission <- sample_submission[, .(id)] 
+
+for(i in 1:28){
+  submission <- merge(submission, 
+                      submit_data[[i]], 
+                      by = "id")   
+}
+
+fwrite(submission, file = "data/submission_step.csv", row.names = FALSE)
